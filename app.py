@@ -8,11 +8,16 @@ from random import randint
 from todos_store import Store
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
-from jaeger_client import Config
-from flask_opentracing import FlaskTracer
 from utils.logging import on_add_todo_logging, on_get_todos_logging
 import os 
 from flask import send_from_directory     
+
+
+from opentracing import set_global_tracer, global_tracer
+from opentelemetry import trace
+from opentelemetry.instrumentation.opentracing_shim import create_tracer
+
+shim = create_tracer(trace.get_tracer_provider())
 
 sentry_sdk.init(
     dsn="https://2acefaf842814814848afd40457bc55d@sentry.io/1381062",
@@ -132,23 +137,9 @@ def duplicate_todo(todoId):
 def favicon(): 
     return send_from_directory(os.path.join(app.root_path, 'static'), 'rookout_favicon.ico', mimetype='image/vnd.microsoft.icon')
 
-def initialize_tracer():
-    config = Config(
-        config={
-            'sampler': {'type': 'const', 'param': 1},
-            'local_agent': {
-                'reporting_host': 'jaeger-agent',
-                'reporting_port': 5775
-            }
-        },
-        service_name='tutorial-python')
-    return config.initialize_tracer()  # also sets opentracing.tracer
-
-
-flask_tracer = FlaskTracer(initialize_tracer, True, app)
-
 import rook
 rook.start()
 
 if __name__ == "__main__":
+    set_global_tracer(shim)
     app.run(host='0.0.0.0')
